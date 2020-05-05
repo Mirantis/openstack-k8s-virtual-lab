@@ -1,0 +1,39 @@
+heat_template_version: queens
+
+parameters:
+  private_floating_network_cidr:
+    type: string
+  private_floating_network_ipam_pool_start:
+    type: string
+  private_floating_network_ipam_pool_end:
+    type: string
+  private_floating_network_gateway:
+    type: string
+    default: ''
+  accessible_network:
+    type: string
+    default: ''
+  control_network_vsrx_peering_ip:
+    type: string
+    default: ''
+
+resources:
+
+  network:
+    type: OS::Neutron::Net
+  subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_resource: network }
+      enable_dhcp: false
+      cidr: { get_param: private_floating_network_cidr }
+      gateway_ip: ~
+      allocation_pools:
+        - start: { get_param: private_floating_network_ipam_pool_start }
+          end: { get_param: private_floating_network_ipam_pool_end }
+
+outputs:
+  private_floating_network_id:
+    value: { get_resource: network }
+  private_floating_subnet_id:
+    value: { get_resource: subnet }

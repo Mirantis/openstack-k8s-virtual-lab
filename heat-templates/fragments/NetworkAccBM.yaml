@@ -1,0 +1,13 @@
+heat_template_version: queens
+
+parameters:
+  public_net_id:
+    type: string
+
+resources:
+
+outputs:
+  public_network:
+    value: { get_param: public_net_id }
+  accessible_subnet_id:
+    value: ''

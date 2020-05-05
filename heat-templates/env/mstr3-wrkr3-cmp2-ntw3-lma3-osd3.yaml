@@ -1,0 +1,60 @@
+resource_registry:
+  "MCP2::NetworkAcc": ../fragments/NetworkAccVM.yaml
+  "MCP2::NetworkAccStorage": ../fragments/NetworkAccVMStorage.yaml
+  "MCP2::NetworkPrvFl": ../fragments/NetworkPrvFlVSRX.yaml
+  "MCP2::SrvInstances": ../fragments/SrvInstancesVM.yaml
+  "MCP2::SrvInstancesCeph": ../fragments/SrvInstancesVMCeph.yaml
+  "MCP2::SrvInstancesCephOSD": ../fragments/SrvInstancesVMCephOSD.yaml
+
+parameters:
+  # IMPORTANT: Set the link to repo with docker EE packages
+  # for example https://storebits.docker.com/ee/trial/sub-7aba6fcd-41db-4a04-bb45-6a79f7862e8d/
+  # docker_ee_url: ''
+  # Set the ssh public key for instances
+  # cluster_public_key
+  image: bionic-server-cloudimg-amd64-20190612
+  ucp_flavor: system.compact.openstack.control # ram: 16384, vcpus: 16, ephemeral: 100
+  masters_flavor: system.compact.openstack.control # ram: 16384, vcpus: 16, ephemeral: 100
+  workers_flavor: system.compact.openstack.control # ram: 16384, vcpus: 16, ephemeral: 100
+  cmps_flavor: system.virtual.openstack.k8s.compute.small # ram: 16384, vcpus: 8, ephemeral: 150
+  lmas_flavor: system.compact.stacklight.server # ram: 16384, vcpus: 12, ephemeral: 120
+  osds_flavor: system.virtual.ceph.osd # ram: 8192, vcpus: 4, ephemeral: 100
+  ntws_flavor: system.compact.opencontrail.control # ram: 16384, vcpus: 8, ephemeral: 50
+  public_net_id: public
+  masters_size: 2
+  worker_size: 3
+  cmp_size: 2
+  lma_size: 3
+  osd_size: 3
+  gtw_size: 0
+  ntw_size: 3
+  ucp_boot_timeout: 3600
+  private_floating_network_cidr: '10.11.12.0/24'
+  private_floating_network_gateway: '10.11.12.1'
+  control_network_vsrx_peering_ip: '10.10.0.131'
+  private_floating_interface: 'ens4'
+  worker_metadata: {"labels": {"openstack-control-plane": "enabled", "openvswitch": "enabled","openstack-gateway":"enabled","local-volume-provisioner": "enabled"}}
+  cmp_metadata: {"labels": {"openstack-compute-node": "enabled", "tfvrouter": "enabled"}}
+  lma_metadata: {"labels": {"role": "stacklight", "stacklight": "enabled","local-volume-provisioner": "enabled"}}
+  osd_metadata: {"labels": {"role": "ceph-osd-node"}}
+  ntw_metadata: {"labels": {"tfanalytics": "enabled", "tfconfig": "enabled", "tfcontrol": "enabled", "tfwebui": "enabled", "tfconfigdb": "enabled", "tfanalyticsdb": "enabled","local-volume-provisioner": "enabled"}}
+  # hardware_metadata which is used for Ceph requires flavor with
+  # ephemeral storage because it is used for Ceph bluestore.
+  hardware_metadata: |
+    '00:00:00:00:00:00':
+      write_files:
+        - path: /usr/share/metadata/ceph.yaml
+          content: |
+            storageDevices:
+              - name: vdb
+                role: hdd
+                sizeGb: 20
+            ramGb: 8
+            cores: 2
+            # The roles will be assigned based on node labels.
+            # roles:
+            #   - mon
+            #   - mgr
+            ips:
+              - 192.168.122.101
+            crushPath: {}

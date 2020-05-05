@@ -1,0 +1,182 @@
+heat_template_version: queens
+
+parameters:
+
+  metadata:
+    type: json
+    default: {}
+  node_type:
+    type: string
+  key_name:
+    type: string
+    description: Name of keypair to assign to servers
+  image:
+    type: string
+    description: Name of image to use for servers
+  flavor:
+    type: string
+    description: Flavor to use for servers
+  accessible_network:
+    type: string
+  accessible_subnet_id:
+    type: string
+  private_floating_network:
+    type: string
+  private_floating_network_cidr:
+    type: string
+  private_floating_subnet_id:
+    type: string
+  private_floating_interface:
+    type: string
+  storage_frontend_network_cidr:
+    type: string
+  storage_frontend_network:
+    type: string
+  storage_frontend_subnet_id:
+    type: string
+  storage_frontend_interface:
+    type: string
+  control_network_cidr:
+    type: string
+  functions_override:
+    type: string
+  boot_timeout:
+    type: number
+    description: Boot timeout for instance
+    default: 3600
+  ucp_master_host:
+    type: string
+    default: ''
+  public_net_id:
+    type: string
+  docker_ee_release:
+    type: string
+  docker_ee_url:
+    type: string
+  hardware_metadata:
+    description: The content of lab metadata.
+    type: string
+  user_data_config:
+    description: This is part of clout-config which denies to mount drive with label ephemeral0 to /mnt
+    type: string
+    default: |
+      #cloud-config
+      #
+      # Don't mount ephemeral0 to /mnt as it's by default
+      mounts:
+        - [ ephemeral0, null ]
+
+resources:
+
+  software_config:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config:
+        str_replace:
+          template: { get_file: ../scripts/instance_boot.sh }
+          params:
+            $node_type:  { get_param: node_type }
+            $wait_condition_notify: { get_attr: [ wait_handle, curl_cli ] }
+            $ucp_license_key: { get_file: ../scripts/license.lic }
+            $docker_ee_url: { get_param: docker_ee_url }
+            $docker_ee_release: { get_param: docker_ee_release }
+            $ucp_master_host: { get_param: ucp_master_host }
+            $node_metadata: { get_param: metadata }
+            $control_network_cidr: { get_param: control_network_cidr }
+            $private_floating_interface: { get_param: private_floating_interface }
+            $private_floating_interface_ip: { get_attr: [private_floating_server_port, fixed_ips, 0, ip_address] }
+            $private_floating_network_cidr: { get_param: private_floating_network_cidr }
+            $functions_override: { get_param: functions_override }
+            $storage_frontend_interface: { get_param: storage_frontend_interface }
+            $storage_frontend_network_interface_ip: { get_attr: [storage_frontend_server_port, fixed_ips, 0, ip_address] }
+            $storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+
+  inject_files:
+    type: "OS::Heat::CloudConfig"
+    properties:
+      cloud_config:
+        write_files:
+          - path: /usr/sbin/prepare-metadata.py
+            owner: "root:root"
+            permissions: "0755"
+            content: {get_file: ../scripts/prepare-metadata.py}
+          - path: /usr/share/metadata/lab-metadata.yaml
+            owner: "root:root"
+            permissions: "0644"
+            content: { get_param: hardware_metadata}
+
+  install_config_agent:
+    type: "OS::Heat::MultipartMime"
+    properties:
+      parts:
+      - config: {get_resource: software_config}
+      - config: {get_resource: inject_files}
+      - config: {get_param: user_data_config}
+
+  server:
+    type: OS::Nova::Server
+    properties:
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      availability_zone: nova
+      networks:
+        - port: { get_resource: accessible_server_port }
+        - port: { get_resource: private_floating_server_port }
+        - port: { get_resource: storage_frontend_server_port }
+      user_data_format: SOFTWARE_CONFIG
+      user_data: { get_resource:  install_config_agent}
+      metadata: { get_param: metadata }
+
+  accessible_server_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: accessible_network }
+      port_security_enabled: false
+      fixed_ips:
+        - subnet: { get_param: accessible_subnet_id }
+
+  storage_frontend_server_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: storage_frontend_network }
+      port_security_enabled: false
+      fixed_ips:
+        - subnet: { get_param: storage_frontend_subnet_id }
+
+  private_floating_server_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: private_floating_network }
+      port_security_enabled: false
+      fixed_ips:
+        - subnet: { get_param: private_floating_subnet_id }
+
+  server_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: accessible_server_port }
+
+  wait_handle:
+    type: OS::Heat::WaitConditionHandle
+  wait_condition:
+    type: OS::Heat::WaitCondition
+    properties:
+      handle: { get_resource: wait_handle }
+      timeout: { get_param: boot_timeout }
+
+outputs:
+  server_private_ip:
+    description: IP address of server in private network
+    value: { get_attr: [server, networks, { get_param: accessible_network}, 0]}
+  server_private_floating_ip:
+    description: IP address of server in private floating network
+    value: { get_attr: [private_floating_server_port, fixed_ips, 0, ip_address] }
+  server_public_ip:
+    description: Floating IP address of server in public network
+    value: { get_attr: [ server_floating_ip, floating_ip_address ] }
+  wc_data:
+    description: Metadata from instance
+    value: { get_attr: [wait_condition, data]}

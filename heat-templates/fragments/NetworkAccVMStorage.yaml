@@ -1,0 +1,39 @@
+heat_template_version: queens
+
+parameters:
+  storage_backend_network_cidr:
+    type: string
+  storage_frontend_network_cidr:
+    type: string
+
+resources:
+
+  storage_backend_network:
+    type: OS::Neutron::Net
+  storage_backend_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_resource: storage_backend_network }
+      enable_dhcp: true
+      cidr: { get_param: storage_backend_network_cidr }
+      gateway_ip: ~
+
+  storage_frontend_network:
+    type: OS::Neutron::Net
+  storage_frontend_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_resource: storage_frontend_network }
+      enable_dhcp: true
+      cidr: { get_param: storage_frontend_network_cidr }
+      gateway_ip: ~
+
+outputs:
+  storage_backend_network_id:
+    value: { get_resource: storage_backend_network }
+  storage_backend_subnet_id:
+    value: { get_resource: storage_backend_subnet }
+  storage_frontend_network_id:
+    value: { get_resource: storage_frontend_network }
+  storage_frontend_subnet_id:
+    value: { get_resource: storage_frontend_subnet }

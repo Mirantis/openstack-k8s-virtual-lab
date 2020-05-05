@@ -1,0 +1,572 @@
+heat_template_version: queens
+
+parameters:
+  image:
+    type: string
+    description: Name of image to use for servers
+  public_net_id:
+    type: string
+    default: ''
+    description: >
+      ID of public network for which floating IP addresses will be allocated/
+      for baremetal case flat provision network for nodes
+  control_network_cidr:
+    type: string
+    description: The CIDR of control network, used to detect control interface.
+    default: '10.10.0.0/24'
+  control_network_vsrx_peering_ip:
+    type: string
+    description: IP address of vsrx for tungsten fabric peering
+    default: ''
+  masters_size:
+    type: number
+    description: Number of masters instances to deploy
+    default: 2
+  worker_size:
+    type: number
+    description: Number of workers to deploy
+    default: 5
+  cmp_size:
+    type: number
+    description: Number of cmp workers to deploy
+    default: 0
+  gtw_size:
+    type: number
+    description: Number of gtw workers to deploy
+    default: 0
+  lma_size:
+    type: number
+    description: Number of gtw workers to deploy
+    default: 0
+  osd_size:
+    type: number
+    description: Number of gtw workers to deploy
+    default: 0
+  spare_size:
+    type: number
+    description: Number of gtw workers to deploy
+    default: 0
+  ntw_size:
+    type: number
+    description: Number of contrail nodes to deploy
+    default: 0
+  ucp_boot_timeout:
+    type: number
+    description: Boot timeout for UCP instance
+    default: 3600
+  cluster_public_key:
+    type: string
+  private_floating_network_cidr:
+    type: string
+    default: '10.11.12.0/24'
+  private_floating_network_ipam_pool_start:
+    type: string
+    description: pool start which is used as pool for IPAM and assigned to instances port
+    default: '10.11.12.2'
+  private_floating_network_ipam_pool_end:
+    type: string
+    description: pool end which is used as pool for IPAM and assigned to instances port
+    default: '10.11.12.99'
+  private_floating_network_pool_start:
+    type: string
+    default: '10.11.12.100'
+  private_floating_network_pool_end:
+    type: string
+    default: '10.11.12.200'
+  private_floating_network_gateway:
+    type: string
+    default: ''
+  private_floating_network_interface:
+    type: string
+    default: 'veth-phy'
+    description: 'The name of interface that should be added to external neutron bridge for floating network.'
+  private_floating_interface:
+    description: Interface which carries floating network for child OpenStack.
+    type: string
+  storage_frontend_network_cidr:
+    type: string
+    default: '10.12.0.0/24'
+  storage_frontend_interface:
+    type: string
+    default: 'ens5'
+  storage_backend_network_cidr:
+    type: string
+    default: '10.11.0.0/24'
+  storage_backend_interface:
+    type: string
+    default: 'ens6'
+  ucp_metadata:
+    type: json
+    default: {"role":"ucp"}
+  master_metadata:
+    type: json
+    default: {"role":"master"}
+  worker_metadata:
+    type: json
+    default: {}
+  cmp_metadata:
+    type: json
+    default: {}
+  gtw_metadata:
+    type: json
+    default: {}
+  lma_metadata:
+    type: json
+    default: {}
+  osd_metadata:
+    type: json
+    default: {}
+  spare_metadata:
+    type: json
+    default: {}
+  ntw_metadata:
+    type: json
+    default: {}
+  ucp_flavor:
+    type: string
+    default: 'system.compact.openstack.proxy'
+  masters_flavor:
+    type: string
+    default: 'system.compact.openstack.proxy'
+  workers_flavor:
+    type: string
+    default: 'system.compact.openstack.control'
+  cmps_flavor:
+    type: string
+    default: 'system.compact.openstack.control'
+  gtws_flavor:
+    type: string
+    default: 'system.compact.openstack.control'
+  lmas_flavor:
+    type: string
+    default: 'system.compact.openstack.control'
+  osds_flavor:
+    type: string
+    default: 'system.virtual.ceph.osd'
+  spares_flavor:
+    type: string
+    default: 'system.compact.openstack.control'
+  ntws_flavor:
+    type: string
+    default: 'system.compact.openstack.control'
+  functions_override:
+    type: string
+    default: ''
+  docker_ee_url:
+    type: string
+  docker_ee_release:
+    type: string
+    default: 'stable-19.03'
+  tunnel_interface:
+    type: string
+    default: ''
+  live_migration_interface:
+    type: string
+    default: ''
+  metallb_address_pools:
+    type: comma_delimited_list
+    default: ''
+  hardware_metadata:
+    description: The content of lab metadata.
+    default: ''
+    type: string
+
+resources:
+  key_pair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: { get_param: "OS::stack_name" }
+      public_key: { get_param: cluster_public_key}
+      save_private_key: false
+
+  accessible_network:
+    type: MCP2::NetworkAcc
+    properties:
+      public_net_id: { get_param: public_net_id }
+
+  private_floating_network:
+    type: MCP2::NetworkPrvFl
+    properties:
+      private_floating_network_cidr: { get_param: private_floating_network_cidr }
+      private_floating_network_ipam_pool_start: { get_param: private_floating_network_ipam_pool_start }
+      private_floating_network_ipam_pool_end: { get_param: private_floating_network_ipam_pool_end }
+      private_floating_network_gateway: {get_param: private_floating_network_gateway}
+      control_network_vsrx_peering_ip: {get_param: control_network_vsrx_peering_ip}
+      accessible_network: { get_attr: [accessible_network, public_network]}
+
+  storage_network:
+    type: MCP2::NetworkAccStorage
+    properties:
+      storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+      storage_backend_network_cidr: { get_param: storage_backend_network_cidr }
+
+  ucp:
+    depends_on:
+     - accessible_network
+     - storage_network
+    type: MCP2::SrvInstances
+    properties:
+      metadata: { get_param: ucp_metadata}
+      docker_ee_url: { get_param: docker_ee_url }
+      docker_ee_release: { get_param: docker_ee_release }
+      node_type: "ucp"
+      key_name: { get_param: "OS::stack_name" }
+      image: { get_param: image }
+      flavor: { get_param: ucp_flavor }
+      accessible_network: { get_attr: [accessible_network, public_network] }
+      private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+      private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+      private_floating_interface: { get_param: private_floating_interface }
+      private_floating_network_cidr: { get_param: private_floating_network_cidr }
+      accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+      public_net_id: { get_param: public_net_id }
+      control_network_cidr: { get_param: control_network_cidr }
+      functions_override: { get_param: functions_override }
+      hardware_metadata: { get_param: hardware_metadata}
+
+  masters:
+    type: OS::Heat::ResourceGroup
+    depends_on:
+     - ucp
+    properties:
+      count: { get_param: masters_size }
+      resource_def:
+        type: MCP2::SrvInstances
+        properties:
+          metadata: { get_param: master_metadata}
+          node_type: "master"
+          key_name: { get_param: "OS::stack_name" }
+          image: { get_param: image }
+          flavor: { get_param: masters_flavor }
+          docker_ee_url: { get_param: docker_ee_url }
+          docker_ee_release: { get_param: docker_ee_release }
+          accessible_network: { get_attr: [accessible_network, public_network] }
+          private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+          private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+          private_floating_interface: { get_param: private_floating_interface }
+          private_floating_network_cidr: { get_param: private_floating_network_cidr }
+          accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+          public_net_id: { get_param: public_net_id }
+          control_network_cidr: { get_param: control_network_cidr }
+          ucp_master_host: { get_attr: [ucp, server_private_ip] }
+          functions_override: { get_param: functions_override }
+          hardware_metadata: { get_param: hardware_metadata}
+
+  workers:
+    type: OS::Heat::ResourceGroup
+    depends_on:
+     - ucp
+    properties:
+      count: { get_param: worker_size }
+      resource_def:
+        type: MCP2::SrvInstancesCephOSD
+        properties:
+          metadata: { get_param: worker_metadata}
+          node_type: "worker"
+          key_name: { get_param: "OS::stack_name" }
+          image: { get_param: image }
+          flavor: { get_param: workers_flavor }
+          key_name: { get_param: "OS::stack_name" }
+          docker_ee_url: { get_param: docker_ee_url }
+          docker_ee_release: { get_param: docker_ee_release }
+          accessible_network: { get_attr: [accessible_network, public_network] }
+          private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+          private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+          private_floating_interface: { get_param: private_floating_interface }
+          private_floating_network_cidr: { get_param: private_floating_network_cidr }
+          accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+          public_net_id: { get_param: public_net_id }
+          control_network_cidr: { get_param: control_network_cidr }
+          ucp_master_host: { get_attr: [ucp, server_private_ip] }
+          functions_override: { get_param: functions_override }
+          storage_frontend_interface: { get_param: storage_frontend_interface }
+          storage_frontend_network: { get_attr: [storage_network, storage_frontend_network_id] }
+          storage_frontend_subnet_id: { get_attr: [storage_network, storage_frontend_subnet_id] }
+          storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+          storage_backend_interface: { get_param: storage_backend_interface }
+          storage_backend_network: { get_attr: [storage_network, storage_backend_network_id] }
+          storage_backend_subnet_id: { get_attr: [storage_network, storage_backend_subnet_id] }
+          storage_backend_network_cidr: { get_param: storage_backend_network_cidr }
+          hardware_metadata: { get_param: hardware_metadata}
+
+  cmps:
+    type: OS::Heat::ResourceGroup
+    depends_on:
+     - ucp
+    properties:
+      count: { get_param: cmp_size }
+      resource_def:
+        type: MCP2::SrvInstancesCephOSD
+        properties:
+          metadata: { get_param: cmp_metadata }
+          node_type: "worker"
+          key_name: { get_param: "OS::stack_name" }
+          image: { get_param: image }
+          flavor: { get_param: cmps_flavor }
+          docker_ee_url: { get_param: docker_ee_url }
+          docker_ee_release: { get_param: docker_ee_release }
+          accessible_network: { get_attr: [accessible_network, public_network] }
+          private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+          private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+          private_floating_interface: { get_param: private_floating_interface }
+          private_floating_network_cidr: { get_param: private_floating_network_cidr }
+          accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+          public_net_id: { get_param: public_net_id }
+          control_network_cidr: { get_param: control_network_cidr }
+          ucp_master_host: { get_attr: [ucp, server_private_ip] }
+          functions_override: { get_param: functions_override }
+          storage_frontend_interface: { get_param: storage_frontend_interface }
+          storage_frontend_network: { get_attr: [storage_network, storage_frontend_network_id] }
+          storage_frontend_subnet_id: { get_attr: [storage_network, storage_frontend_subnet_id] }
+          storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+          storage_backend_interface: { get_param: storage_backend_interface }
+          storage_backend_network: { get_attr: [storage_network, storage_backend_network_id] }
+          storage_backend_subnet_id: { get_attr: [storage_network, storage_backend_subnet_id] }
+          storage_backend_network_cidr: { get_param: storage_backend_network_cidr }
+          hardware_metadata: { get_param: hardware_metadata}
+
+  gtws:
+    type: OS::Heat::ResourceGroup
+    depends_on:
+     - ucp
+    properties:
+      count: { get_param: gtw_size }
+      resource_def:
+        type: MCP2::SrvInstancesCeph
+        properties:
+          metadata: { get_param: gtw_metadata }
+          node_type: "worker"
+          key_name: { get_param: "OS::stack_name" }
+          image: { get_param: image }
+          flavor: { get_param: gtws_flavor }
+          docker_ee_url: { get_param: docker_ee_url }
+          docker_ee_release: { get_param: docker_ee_release }
+          accessible_network: { get_attr: [accessible_network, public_network] }
+          private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+          private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+          private_floating_interface: { get_param: private_floating_interface }
+          private_floating_network_cidr: { get_param: private_floating_network_cidr }
+          accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+          public_net_id: { get_param: public_net_id }
+          control_network_cidr: { get_param: control_network_cidr }
+          ucp_master_host: { get_attr: [ucp, server_private_ip] }
+          functions_override: { get_param: functions_override }
+          storage_frontend_interface: { get_param: storage_frontend_interface }
+          storage_frontend_network: { get_attr: [storage_network, storage_frontend_network_id] }
+          storage_frontend_subnet_id: { get_attr: [storage_network, storage_frontend_subnet_id] }
+          storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+          hardware_metadata: { get_param: hardware_metadata}
+
+  lmas:
+    type: OS::Heat::ResourceGroup
+    depends_on:
+     - ucp
+    properties:
+      count: { get_param: lma_size }
+      resource_def:
+        type: MCP2::SrvInstancesCeph
+        properties:
+          metadata: { get_param: lma_metadata }
+          node_type: "worker"
+          key_name: { get_param: "OS::stack_name" }
+          image: { get_param: image }
+          flavor: { get_param: lmas_flavor }
+          docker_ee_url: { get_param: docker_ee_url }
+          docker_ee_release: { get_param: docker_ee_release }
+          accessible_network: { get_attr: [accessible_network, public_network] }
+          private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+          private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+          private_floating_interface: { get_param: private_floating_interface }
+          private_floating_network_cidr: { get_param: private_floating_network_cidr }
+          accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+          public_net_id: { get_param: public_net_id }
+          control_network_cidr: { get_param: control_network_cidr }
+          ucp_master_host: { get_attr: [ucp, server_private_ip] }
+          functions_override: { get_param: functions_override }
+          storage_frontend_interface: { get_param: storage_frontend_interface }
+          storage_frontend_network: { get_attr: [storage_network, storage_frontend_network_id] }
+          storage_frontend_subnet_id: { get_attr: [storage_network, storage_frontend_subnet_id] }
+          storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+          hardware_metadata: { get_param: hardware_metadata}
+
+  osds:
+    type: OS::Heat::ResourceGroup
+    depends_on:
+     - ucp
+    properties:
+      count: { get_param: osd_size }
+      resource_def:
+        type: MCP2::SrvInstancesCephOSD
+        properties:
+          metadata: { get_param: osd_metadata }
+          node_type: "worker"
+          key_name: { get_param: "OS::stack_name" }
+          image: { get_param: image }
+          flavor: { get_param: osds_flavor }
+          docker_ee_url: { get_param: docker_ee_url }
+          docker_ee_release: { get_param: docker_ee_release }
+          accessible_network: { get_attr: [accessible_network, public_network] }
+          private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+          private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+          private_floating_interface: { get_param: private_floating_interface }
+          private_floating_network_cidr: { get_param: private_floating_network_cidr }
+          accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+          public_net_id: { get_param: public_net_id }
+          control_network_cidr: { get_param: control_network_cidr }
+          ucp_master_host: { get_attr: [ucp, server_private_ip] }
+          functions_override: { get_param: functions_override }
+          storage_frontend_interface: { get_param: storage_frontend_interface }
+          storage_frontend_network: { get_attr: [storage_network, storage_frontend_network_id] }
+          storage_frontend_subnet_id: { get_attr: [storage_network, storage_frontend_subnet_id] }
+          storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+          storage_backend_interface: { get_param: storage_backend_interface }
+          storage_backend_network: { get_attr: [storage_network, storage_backend_network_id] }
+          storage_backend_subnet_id: { get_attr: [storage_network, storage_backend_subnet_id] }
+          storage_backend_network_cidr: { get_param: storage_backend_network_cidr }
+          hardware_metadata: { get_param: hardware_metadata}
+
+  spares:  # spares for osds/cmps
+    type: OS::Heat::ResourceGroup
+    depends_on:
+     - ucp
+    properties:
+      count: { get_param: spare_size }
+      resource_def:
+        type: MCP2::SrvInstancesCephOSD
+        properties:
+          metadata: { get_param: spare_metadata }
+          node_type: "spare"
+          key_name: { get_param: "OS::stack_name" }
+          image: { get_param: image }
+          flavor: { get_param: spares_flavor }
+          docker_ee_url: { get_param: docker_ee_url }
+          docker_ee_release: { get_param: docker_ee_release }
+          accessible_network: { get_attr: [accessible_network, public_network] }
+          private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+          private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+          private_floating_interface: { get_param: private_floating_interface }
+          private_floating_network_cidr: { get_param: private_floating_network_cidr }
+          accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+          public_net_id: { get_param: public_net_id }
+          control_network_cidr: { get_param: control_network_cidr }
+          ucp_master_host: { get_attr: [ucp, server_private_ip] }
+          functions_override: { get_param: functions_override }
+          storage_frontend_interface: { get_param: storage_frontend_interface }
+          storage_frontend_network: { get_attr: [storage_network, storage_frontend_network_id] }
+          storage_frontend_subnet_id: { get_attr: [storage_network, storage_frontend_subnet_id] }
+          storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+          storage_backend_interface: { get_param: storage_backend_interface }
+          storage_backend_network: { get_attr: [storage_network, storage_backend_network_id] }
+          storage_backend_subnet_id: { get_attr: [storage_network, storage_backend_subnet_id] }
+          storage_backend_network_cidr: { get_param: storage_backend_network_cidr }
+          hardware_metadata: { get_param: hardware_metadata}
+
+  ntws:
+    type: OS::Heat::ResourceGroup
+    depends_on:
+     - ucp
+    properties:
+      count: { get_param: ntw_size }
+      resource_def:
+        type: MCP2::SrvInstancesCeph
+        properties:
+          metadata: { get_param: ntw_metadata }
+          node_type: "worker"
+          key_name: { get_param: "OS::stack_name" }
+          image: { get_param: image }
+          flavor: { get_param: ntws_flavor }
+          docker_ee_url: { get_param: docker_ee_url }
+          docker_ee_release: { get_param: docker_ee_release }
+          accessible_network: { get_attr: [accessible_network, public_network] }
+          private_floating_network: { get_attr: [private_floating_network, private_floating_network_id] }
+          private_floating_subnet_id: { get_attr: [private_floating_network, private_floating_subnet_id] }
+          private_floating_interface: { get_param: private_floating_interface }
+          private_floating_network_cidr: { get_param: private_floating_network_cidr }
+          accessible_subnet_id: { get_attr: [accessible_network, accessible_subnet_id]}
+          public_net_id: { get_param: public_net_id }
+          control_network_cidr: { get_param: control_network_cidr }
+          ucp_master_host: { get_attr: [ucp, server_private_ip] }
+          functions_override: { get_param: functions_override }
+          storage_frontend_interface: { get_param: storage_frontend_interface }
+          storage_frontend_network: { get_attr: [storage_network, storage_frontend_network_id] }
+          storage_frontend_subnet_id: { get_attr: [storage_network, storage_frontend_subnet_id] }
+          storage_frontend_network_cidr: { get_param: storage_frontend_network_cidr }
+          hardware_metadata: { get_param: hardware_metadata}
+
+outputs:
+  ucp_ips:
+    description: Private IP addresses of the deployed ucp instances
+    value: { get_attr: [ucp, server_public_ip] }
+  masters_ips:
+    description: Private IP addresses of the deployed masters instances
+    value: { get_attr: [masters, server_public_ip] }
+  workers_ips:
+    description: Private IP addresses of the deployed worker instances
+    value: { get_attr: [workers, server_public_ip] }
+  cmps_ips:
+    description: Private IP addresses of the deployed cmp instances
+    value: { get_attr: [cmps, server_public_ip] }
+  gtws_ips:
+    description: Private IP addresses of the deployed gtw instances
+    value: { get_attr: [gtws, server_public_ip] }
+  lmas_ips:
+    description: Private IP addresses of the deployed lma instances
+    value: { get_attr: [lmas, server_public_ip] }
+  osds_ips:
+    description: Private IP addresses of the deployed osd instances
+    value: { get_attr: [osds, server_public_ip] }
+  spares_ips:
+    description: Private IP addresses of the deployed spare instances
+    value: { get_attr: [spares, server_public_ip] }
+  ntws_ips:
+    description: Private IP addresses of the deployed contrail instances
+    value: { get_attr: [ntws, server_public_ip] }
+  worker_private_floating_ips:
+    description: IPs might be used as gateway
+    value: { get_attr: [workers, server_private_floating_ip] }
+  private_floating_cidr:
+    value: { get_param: private_floating_network_cidr }
+  private_floating_network_pool_start:
+    value: { get_param: private_floating_network_pool_start }
+  private_floating_network_pool_end:
+    value: { get_param: private_floating_network_pool_end }
+  private_floating_network_gateway:
+    value: { get_param: private_floating_network_gateway }
+  private_floating_network_interface:
+    value: { get_param: private_floating_network_interface }
+  tunnel_interface:
+    value: { get_param: tunnel_interface }
+  live_migration_interface:
+    value: { get_param: live_migration_interface }
+  metallb_address_pools:
+    value: { get_param: metallb_address_pools }
+  ucp_wc_data:
+    description: Metadata from ucp
+    value: { get_attr: [ucp, wc_data] }
+  masters_wc_data:
+    description: Metadata from masters
+    value: { get_attr: [masters, wc_data] }
+  workers_wc_data:
+    description: Metadata from workers
+    value: { get_attr: [workers, wc_data] }
+  cmps_wc_data:
+    description: Metadata from cmps
+    value: { get_attr: [cmps, wc_data] }
+  gtws_wc_data:
+    description: Metadata from gtws
+    value: { get_attr: [gtws, wc_data] }
+  lmas_wc_data:
+    description: Metadata from lmas
+    value: { get_attr: [lmas, wc_data] }
+  osds_wc_data:
+    description: Metadata from osds
+    value: { get_attr: [osds, wc_data] }
+  ntws_wc_data:
+    description: Metadata from ntws
+    value: { get_attr: [ntws, wc_data] }
+  storage_frontend_network_cidr:
+    description: Storage network which is used as clientNet in Ceph CR
+    value: { get_param: storage_frontend_network_cidr }
+  storage_backend_network_cidr:
+    description: Storage network which is used as clusterNet in Ceph CR
+    value: { get_param: storage_backend_network_cidr }
