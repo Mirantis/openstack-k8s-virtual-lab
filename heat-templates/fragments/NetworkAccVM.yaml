@@ -3,6 +3,8 @@ heat_template_version: queens
 parameters:
   public_net_id:
     type: string
+  dns_nameservers:
+    type: json
 
 resources:
 
@@ -14,9 +16,7 @@ resources:
       network: { get_resource: network }
       enable_dhcp: true
       cidr: '10.10.0.0/24'
-      dns_nameservers:
-        - 172.18.224.6
-        - 172.18.176.6
+      dns_nameservers: { get_param: dns_nameservers }
   router:
     type: OS::Neutron::Router
     properties:

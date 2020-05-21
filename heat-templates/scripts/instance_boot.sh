@@ -213,8 +213,6 @@ function create_ucp_config {
 [scheduling_configuration]
     enable_admin_ucp_scheduling = true
     default_node_orchestrator = \"kubernetes\"
-[cluster_config]
-    dns = [\"172.18.208.44\"]
 " | docker config create com.docker.ucp.config -
 }
 

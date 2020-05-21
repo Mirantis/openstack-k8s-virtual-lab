@@ -10,6 +10,10 @@ parameters:
     description: >
       ID of public network for which floating IP addresses will be allocated/
       for baremetal case flat provision network for nodes
+  dns_nameservers:
+    type: json
+    default: []
+    description: 'List of dns servers for VMs'
   control_network_cidr:
     type: string
     description: The CIDR of control network, used to detect control interface.
@@ -183,6 +187,7 @@ resources:
     type: MCP2::NetworkAcc
     properties:
       public_net_id: { get_param: public_net_id }
+      dns_nameservers: { get_param: dns_nameservers }
 
   private_floating_network:
     type: MCP2::NetworkPrvFl
