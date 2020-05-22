@@ -30,7 +30,7 @@ parameters:
   ucp_boot_timeout: 3600
   private_floating_network_cidr: '10.11.12.0/24'
   private_floating_interface: 'ens4'
-  worker_metadata: {"labels": {"openstack-control-plane":"enabled",openvswitch":"enabled","openstack-gateway":"enabled","local-volume-provisioner": "enabled"}}
+  worker_metadata: {"labels": {"openstack-control-plane":"enabled","openvswitch":"enabled","openstack-gateway":"enabled","local-volume-provisioner": "enabled"}}
   cmp_metadata: {"labels": {"openstack-compute-node":"enabled","openvswitch":"enabled"}}
   gtw_metadata: {"labels": {"openvswitch":"enabled", "openstack-gateway": "enabled"}}
   lma_metadata: {"labels": {"role": "stacklight", "stacklight": "enabled","local-volume-provisioner": "enabled"}}
