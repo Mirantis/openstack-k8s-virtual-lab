@@ -1,4 +1,4 @@
-heat_template_version: queens
+heat_template_version: ocata
 
 parameters:
 
@@ -120,7 +120,7 @@ resources:
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
-      availability_zone: nova
+      availability_zone: AMS-EU4
       networks:
         - port: { get_resource: accessible_server_port }
         - port: { get_resource: private_floating_server_port }

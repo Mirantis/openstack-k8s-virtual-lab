@@ -1,4 +1,4 @@
-heat_template_version: queens
+heat_template_version: ocata
 
 parameters:
   public_net_id:
@@ -15,8 +15,10 @@ resources:
       enable_dhcp: true
       cidr: '10.10.0.0/24'
       dns_nameservers:
-        - 172.18.224.6
-        - 172.18.176.6
+      #        - 172.18.224.6
+      #        - 172.18.176.6
+        - 8.8.8.8
+        - 8.8.4.4
   router:
     type: OS::Neutron::Router
     properties:

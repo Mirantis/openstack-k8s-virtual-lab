@@ -1,4 +1,4 @@
-heat_template_version: queens
+heat_template_version: ocata
 
 parameters:
   private_floating_network_cidr:

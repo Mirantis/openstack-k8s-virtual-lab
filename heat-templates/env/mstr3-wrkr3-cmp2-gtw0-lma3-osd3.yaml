@@ -9,9 +9,9 @@ resource_registry:
 parameters:
   # IMPORTANT: Set the link to repo with docker EE packages
   # for example https://storebits.docker.com/ee/trial/sub-7aba6fcd-41db-4a04-bb45-6a79f7862e8d/
-  # docker_ee_url: ''
+  docker_ee_url: 'https://storebits.docker.com/ee/ubuntu/sub-0eb49e2a-4299-4d5d-b48c-3ceda5e66eb3'
   # Set the ssh public key for instances
-  # cluster_public_key
+  cluster_public_key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+gVQadQKdudlNpoWhAPBusdn+EH8B2FjZMofl4AnmDCfy6hvisLpZMIu0BalYtXixpADRQTxJxJMom7xACX0IbVhZ2eeIGgA5WSuxJ+V53D5VaFej4WhEjpHuaT4S8oCKLI85//b0EnIpRZK0t3ey2VYXptpmvD7BxrfThEsk5j14RXsKpoTF4XYuafQSiRLcEN/3oMn+8X5gH7Fnnv6jR9K/54BPZnt4vdQ/i/lI+bl2JubfO75J876qyHqR4uJbJc9INlOlRfI4v1ar/RzL5y3d6OQvQYgBJI9Ibj1HlmyaVRRHQhA2erAWcxWHzDwNT99mXY8FxI1DyJFQcWM7 ubuntu@ams2-jumper'
   image: bionic-server-cloudimg-amd64-20190612
   ucp_flavor: system.compact.openstack.control # ram: 16384, vcpus: 16, ephemeral: 100
   masters_flavor: system.compact.openstack.control # ram: 16384, vcpus: 16, ephemeral: 100
@@ -20,7 +20,7 @@ parameters:
   gtws_flavor: system.compact.openstack.gateway # ram: 8192, vcpus: 4, ephemeral: 0
   lmas_flavor: system.compact.stacklight.server # ram: 16384, vcpus: 12, ephemeral: 120
   osds_flavor: system.virtual.ceph.osd # ram: 8192, vcpus: 4, ephemeral: 100
-  public_net_id: public
+  public_net_id: floating
   masters_size: 2
   worker_size: 3
   cmp_size: 2
