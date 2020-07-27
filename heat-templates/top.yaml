@@ -154,6 +154,7 @@ parameters:
     default: ''
   docker_ee_url:
     type: string
+    default: "https://storebits.docker.com/ubuntu"
   docker_ee_release:
     type: string
     default: 'stable-19.03'
