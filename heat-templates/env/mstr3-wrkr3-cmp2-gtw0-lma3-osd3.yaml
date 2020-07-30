@@ -7,10 +7,7 @@ resource_registry:
   "MCP2::SrvInstancesCephOSD": ../fragments/SrvInstancesVMCephOSD.yaml
 
 parameters:
-  # IMPORTANT: Set the link to repo with docker EE packages
-  # for example https://storebits.docker.com/ee/trial/sub-7aba6fcd-41db-4a04-bb45-6a79f7862e8d/
-  # docker_ee_url: ''
-  # Set the ssh public key for instances
+  # IMPORTANT: Set the ssh public key for instances
   # cluster_public_key
   image: bionic-server-cloudimg-amd64-20190612
   ucp_flavor: system.compact.openstack.control # ram: 16384, vcpus: 16, ephemeral: 100
